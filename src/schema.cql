@@ -1,5 +1,10 @@
 select toDate(now()) from system.local;
 
+DROP KEYSPACE mykeyspace;
+
+CREATE KEYSPACE mykeyspace
+  WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replication_factor' : 3 };
+
 use mykeyspace;
 
 DROP TABLE dvds;
