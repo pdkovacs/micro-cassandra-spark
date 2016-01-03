@@ -25,7 +25,7 @@ Note that
 
 ### Manage swapping
 
-Either allow cassandra locking the heap
+Either allow cassandra to lock the heap
 
     sudo su -
     awk '/# End of file/ {
