@@ -25,7 +25,7 @@ CREATE TABLE dvds (
   release_date text,
   id int,
   timestamp text,
-  PRIMARY KEY ((id, title, genre), year, release_date)
+  PRIMARY KEY (id)
 );
 
 -- COPY dvds (title, studio, released, status, sound, versions, price, rating, year, genre, aspect, upc_id, release_date, id, timestamp) FROM '/Users/pkovacs/Downloads/dvd_csv/dvd_csv.txt';

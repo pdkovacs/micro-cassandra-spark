@@ -68,7 +68,7 @@ public class DVDsLoad
 														  "release_date text, " +
 														  "id int, " +
 														  "timestamp text, " +
-														  "PRIMARY KEY ((id, title, genre), year, release_date)" +
+														  "PRIMARY KEY (id)" +
     													");", KEYSPACE, TABLE);
 
     /**
