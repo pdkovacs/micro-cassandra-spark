@@ -35,7 +35,7 @@ Either allow cassandra to lock the heap
     }1' /etc/security/limits.conf > new.limits.conf && \
     mv new.limits.conf /etc/security/limits.conf
 
-or (what we shouldn’t but may do with significant physical memory constraints) allow swapping:
+or (what we shouldn’t but may do under significant physical memory constraints) allow swapping:
 
     $ sudo dd if=/dev/zero of=/swapfile bs=1024k count=1024
     $ sudo chmod 600 /swapfile
