@@ -87,9 +87,86 @@ or (what we shouldn’t but may do under significant physical memory constraints
 1. select count(*) may take a long time -> set [connection]/client_timeout in ~/.cassandra/.cqlshrc
 1. put all settings which are strictly necessary in ~/.cassandra/.cqlshrc into comment
 
-### Setup Spark
+### Configure Spark
 
-https://docs.google.com/document/d/1jbVum0ok8ANQ8KM5TdPPBNEMPzuC8iXfF-dVhc0fr6s/edit?usp=sharing
+#### Set environment variables
+
+    create_send_script() {
+        cat > t.sh <<EOF
+        awk '
+            /^# - SPARK_WORKER_CORES/ {
+                print "SPARK_WORKER_CORES=2";
+            }
+            /^# - SPARK_WORKER_MEMORY:/ {
+                print "SPARK_WORKER_MEMORY=400m";
+            }1
+        ' spark/conf/spark-env.sh > temp.spark-env.sh
+        mv temp.spark-env.sh spark/conf/spark-env.sh
+    EOF
+        scp t.sh linaro@${ip}:
+    }
+
+    i=1
+    for i in $(seq 1 6);
+    do
+        ip=192.168.1.20${i};
+
+        create_send_script
+        ssh linaro@${ip} bash t.sh
+
+        i=$((i+1));
+    done
+
+
+# Build the Cassandra connector
+
+## Prepare the build
+
+### Make sure sbt is installed
+
+http://www.scala-sbt.org/download.html
+
+### Clone and checkout the connector code from Github
+
+    $ git clone https://github.com/datastax/spark-cassandra-connector
+    $ cd spark-cassandra-connector
+    $ git checkout b1.5
+
+### Add missing entries to the SBT-assemblyMergeStrategy
+
+    [pkovacs@gokyuzu spark-cassandra-connector]$ git diff
+    diff --git a/project/Settings.scala b/project/Settings.scala
+    index 18b094b..87fac88 100644
+    --- a/project/Settings.scala
+    +++ b/project/Settings.scala
+    @@ -331,8 +331,12 @@ object Settings extends Build {
+         assemblyMergeStrategy in assembly <<= (assemblyMergeStrategy in assembly) {
+           (old) => {
+             case PathList("META-INF", "io.netty.versions.properties", xs @ _*) => MergeStrategy.last
+    -        case PathList("com", "google", xs @ _*) => MergeStrategy.last
+    -        case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.last
+    +        case PathList("com", xs @ _*) => MergeStrategy.last
+    +        case PathList("io", xs @ _*) => MergeStrategy.last
+    +        case PathList("javax", xs @ _*) => MergeStrategy.first
+    +        case PathList("org", xs @ _*) => MergeStrategy.last
+    +        case PathList("META-INF", "MANIFEST.MF") => MergeStrategy.discard
+    +        case PathList("META-INF", xs @ _*) => MergeStrategy.last
+             case x => old(x)
+           }
+         }
+    [pkovacs@gokyuzu spark-cassandra-connector]$ 
+
+## Execute the build
+
+    $ sbt assembly
+
+## Create convenience shorthand for assembled connector jar
+
+    $ export SPARK_CASSANDRA_CONNECTOR_ASSEMBLY=/Users/pkovacs/kittenpark/git/spark-cassandra-connector/spark-cassandra-connector-java/target/scala-2.10/spark-cassandra-connector-java-assembly-1.5.0-M4-SNAPSHOT.jar
+
+## Fix manifest files
+
+    $ zip -d $SPARK_CASSANDRA_CONNECTOR_ASSEMBLY META-INF/*.RSA META-INF/*.DSA META-INF/*.SF
 
 # Test the clusters
 
@@ -165,3 +242,50 @@ To start all six cassandra nodes:
     real    2m42.679s
     real    2m42.278s
     real    2m43.151s
+
+## Start Spark
+
+### Start stand-alone resource manager
+
+    ./sbin/start-master.sh
+
+### Start the nodes
+
+    for i in $(seq 1 6);
+    do
+        ip=192.168.1.20${i};
+        echo $ip;
+        ssh linaro@$ip ". /home/linaro/.profile; export SPARK_DAEMON_MEMORY=400m; spark/sbin/start-slave.sh spark://gokyuzu:7077";
+    done
+
+## Working with the Spark-shell
+
+### Work around a Spark-shell issue
+
+http://stackoverflow.com/a/34264232
+
+    [pkovacs@gokyuzu spark-1.5.2-bin-hadoop2.6]$ grep cassandra conf/spark-defaults.conf
+    spark.cassandra.connection.host    192.168.1.201
+    [pkovacs@gokyuzu spark-1.5.2-bin-hadoop2.6]$ 
+
+### Start Spark-shell
+
+    ./bin/spark-shell \
+        --executor-memory 400M \
+        --jars $SPARK_CASSANDRA_CONNECTOR_ASSEMBLY \
+        --master spark://gokyuzu:7077
+
+### Execute in Spark-shell
+
+    import com.datastax.spark.connector._, org.apache.spark.SparkContext, org.apache.spark.SparkContext._, org.apache.spark.SparkConf
+    val rdd = sc.cassandraTable("mykeyspace", "dvds");
+    val pirateMovies = rdd.filter(_.getString("title").contains("Pirate")).cache();
+    println(pirateMovies.count);
+    val knownYearPirateMovies = pirateMovies.filter(_.getString("year").forall(Character.isDigit(_)));
+    println(knownYearPirateMovies.count);
+    val mostRecentPirateMovie = knownYearPirateMovies.max()(new Ordering[com.datastax.spark.connector.CassandraRow]() {
+        override def compare(x: com.datastax.spark.connector.CassandraRow, y: com.datastax.spark.connector.CassandraRow): Int = 
+        Ordering[Int].compare(Integer.parseInt(x.getString("year")), Integer.parseInt(y.getString("year")))
+    });
+    println(mostRecentPirateMovie);
+})
