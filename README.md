@@ -255,7 +255,7 @@ To start all six cassandra nodes:
     do
         ip=192.168.1.20${i};
         echo $ip;
-        ssh linaro@$ip ". /home/linaro/.profile; export SPARK_DAEMON_MEMORY=400m; spark/sbin/start-slave.sh spark://gokyuzu:7077";
+        ssh linaro@$ip ". /home/linaro/.profile; export SPARK_DAEMON_MEMORY=128m; spark/sbin/start-slave.sh spark://gokyuzu:7077";
     done
 
 ## Working with the Spark-shell
@@ -277,17 +277,31 @@ http://stackoverflow.com/a/34264232
 
 ### Execute in Spark-shell
 
-    import com.datastax.spark.connector._, org.apache.spark.SparkContext, org.apache.spark.SparkContext._, org.apache.spark.SparkConf
+    import com.datastax.spark.connector._
+    import org.apache.spark.SparkContext
+    import org.apache.spark.SparkContext._
+    import org.apache.spark.SparkConf
+
     val rdd = sc.cassandraTable("mykeyspace", "dvds");
     val pirateMovies = rdd.filter(_.getString("title").contains("Pirate")).cache();
     println(pirateMovies.count);
+
     val knownYearPirateMovies = pirateMovies.filter(_.getString("year").forall(Character.isDigit(_)));
     println(knownYearPirateMovies.count);
-    val mostRecentPirateMovie = knownYearPirateMovies.max()(new Ordering[com.datastax.spark.connector.CassandraRow]() {
-        override def compare(x: com.datastax.spark.connector.CassandraRow, y: com.datastax.spark.connector.CassandraRow): Int = 
-        Ordering[Int].compare(Integer.parseInt(x.getString("year")), Integer.parseInt(y.getString("year")))
+
+    val mostRecentPirateMovie = knownYearPirateMovies.max()(new Ordering[CassandraRow]() {
+        override def compare(x: CassandraRow, y: CassandraRow): Int = Ordering[Int].compare(
+            Integer.parseInt(x.getString("year")), Integer.parseInt(y.getString("year"))
+        )
     });
     println(mostRecentPirateMovie);
+
+    val caribbeanPirateMovies = knownYearPirateMovies.filter(
+        (row: CassandraRow) => row.getString("title").contains("Caribbean")
+    );
+    caribbeanPirateMovies.collect().foreach(
+        (row: CassandraRow) => println(row.getString("title") + " (" + row.getString("year") + ")")
+    );
 
 
 #### Errors during execution
