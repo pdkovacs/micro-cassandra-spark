@@ -306,9 +306,13 @@ http://stackoverflow.com/a/34264232
 
 #### Errors during execution
 
+**Error message** in Spark-shell:
+
     scala> 16/01/05 15:57:32 ERROR TaskSchedulerImpl: Lost executor 2 on 192.168.1.206: remote Rpc client disassociated
     16/01/05 15:57:32 WARN ReliableDeliverySupervisor: Association with remote system [akka.tcp://sparkExecutor@192.168.1.206:49987] has failed, address is now gated for [5000] ms. Reason: [Disassociated] 
 
-Reason (in 192.168.1.20.6:/home/linaro/spark-1.5.2-bin-hadoop2.6/work/app-20160105141049-0001/2/stderr)
+**Reason**: (in 192.168.1.20.6:/home/linaro/spark-1.5.2-bin-hadoop2.6/work/app-20160105141049-0001/2/stderr):
 
     16/01/05 15:19:32 ERROR TransportClient: Failed to send RPC 7403460359111559552 to /192.168.1.204:60871: java.lang.OutOfMemoryError
+
+**Fix**: reducing SPARK_DAEMON_MEMORY seems to fix it.
