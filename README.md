@@ -1,5 +1,5 @@
 # micro-cassandra-spark
-Testing spark with cassandra in a micro cluster consisting of a limited number of Raspberry Pi 2 nodes
+Testing spark with cassandra in a micro cluster consisting of a small number of Raspberry Pi 2 nodes
 
 # Configure the clusters
 
